@@ -1,0 +1,56 @@
+# Local development overrides: live code mount, Vite dev server, Mailpit, MySQL on localhost:3306.
+#
+# vendor/ is kept in a Docker volume rather than on the Windows mount. Reading
+# ~1,000 framework files across that mount made every request take ~2s.
+# Composer must run inside the container so it writes to that volume:
+#   docker compose exec app composer require <package>
+services:
+  app:
+    volumes:
+      - .:/var/www/html
+      - vendor:/var/www/html/vendor
+    environment:
+      # OPcache on, re-checking timestamps every request so code edits apply instantly.
+      PHP_OPCACHE_ENABLE: "1"
+      PHP_OPCACHE_VALIDATE_TIMESTAMPS: "1"
+      PHP_OPCACHE_REVALIDATE_FREQ: "0"
+      # No config/route caching in dev: edits apply immediately, and tests can
+      # use phpunit.xml's in-memory database instead of a cached MySQL config.
+      AUTORUN_LARAVEL_OPTIMIZE: "false"
+      AUTORUN_LARAVEL_CONFIG_CACHE: "false"
+      AUTORUN_LARAVEL_ROUTE_CACHE: "false"
+      AUTORUN_LARAVEL_VIEW_CACHE: "false"
+      AUTORUN_LARAVEL_EVENT_CACHE: "false"
+
+  worker:
+    volumes:
+      - .:/var/www/html
+      - vendor:/var/www/html/vendor
+    environment:
+      PHP_OPCACHE_ENABLE: "0"
+
+  vite:
+    image: node:22-alpine
+    working_dir: /app
+    command: sh -c "npm install && npm run dev"
+    environment:
+      VITE_POLLING: "true"
+    ports:
+      - "5173:5173"
+    volumes:
+      - .:/app
+      - node-modules:/app/node_modules
+
+  # Catches all outgoing mail in dev. Inbox UI: http://localhost:8025
+  mailpit:
+    image: axllent/mailpit:v1.27
+    ports:
+      - "8025:8025"
+
+  mysql:
+    ports:
+      - "3306:3306"
+
+volumes:
+  node-modules:
+  vendor:

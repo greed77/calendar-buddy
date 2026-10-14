@@ -1,0 +1,48 @@
+# Production-style stack: app (web), worker (queued mail), mysql.
+# For local development, compose.override.yaml is merged in automatically.
+services:
+  app:
+    build:
+      context: .
+      target: app
+    image: meeting-poll
+    env_file: .env
+    ports:
+      - "${APP_PORT:-8080}:8080"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    restart: unless-stopped
+
+  worker:
+    image: meeting-poll
+    env_file: .env
+    command: ["php", "/var/www/html/artisan", "queue:work", "--tries=3", "--backoff=30"]
+    environment:
+      AUTORUN_ENABLED: "false"
+    stop_signal: SIGTERM
+    healthcheck:
+      test: ["CMD", "healthcheck-queue"]
+      start_period: 10s
+    depends_on:
+      app:
+        condition: service_started
+    restart: unless-stopped
+
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE}
+      MYSQL_USER: ${DB_USERNAME}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u", "root", "-p${DB_ROOT_PASSWORD}"]
+      interval: 5s
+      retries: 20
+    restart: unless-stopped
+
+volumes:
+  mysql-data:
