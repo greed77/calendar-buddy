@@ -128,3 +128,7 @@ To add a PHP package, run Composer inside the container: `docker compose exec ap
 ## License
 
 GNU General Public License v3.0. See [LICENSE](LICENSE).
+
+## Support
+
+Want to say thanks? [Buy me a coffee](https://ko-fi.com/tehgreedo)!
