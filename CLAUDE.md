@@ -10,7 +10,7 @@ An internal Doodle/Rallly-style app. Its only job is polling for meeting times.
 ## Stack
 
 - Laravel 13, Livewire 4 (class-based components in `app/Livewire`, views in `resources/views/livewire`), Tailwind 4 via Vite.
-- MySQL 8.4. Everything runs in Docker. **PHP, Composer and MySQL are not installed on the host. Don't install them.** Host Node is v21, which is too old for Vite 8, so Node also runs in a container.
+- MySQL 8.4. Everything runs in Docker, so the only thing the host needs is Docker. **Don't install PHP, Composer or MySQL on the host.** Node runs in a container too, so the host's Node version (if any) doesn't matter.
 - Image: `serversideup/php:8.4-fpm-nginx`, which listens on 8080 inside the container.
 
 ## Running it
@@ -23,8 +23,8 @@ docker compose restart worker                 # after changing anything a queued
 docker compose exec app composer require <pkg>   # add a package (must run in the container, see below)
 ```
 
-- **`vendor/` lives in a Docker volume in dev, not on D:.** Reading the framework's ~1,000 files across the Windows mount made every request take ~2s; with the volume it's ~0.1s. That means Composer has to run inside the `app` container so it writes to the volume. The host `vendor/` folder is a stale copy that only your editor uses for autocompletion.
-- If the app crash-loops with `Class "...ServiceProvider" not found`, `vendor/` and `bootstrap/cache/packages.php` are out of sync. Delete `bootstrap/cache/packages.php` and `services.php`, then run `docker compose run --rm --no-deps --entrypoint "" app composer install`.
+- **In dev, `vendor/` lives in a Docker volume, not in the project folder.** With Docker Desktop, especially on Windows, reading files from the mounted project folder is slow. Loading the framework's ~1,000 files from there made every request take about 2 seconds; from the volume it takes about 0.1 seconds. That means Composer has to run inside the `app` container so it writes to the volume. A `vendor/` folder on the host, if there is one, is only for your editor's autocompletion and may be out of date.
+- If the app crash-loops with `Class "...ServiceProvider" not found`, `vendor/` and `bootstrap/cache/packages.php` are out of sync. Delete `bootstrap/cache/packages.php` and `services.php`, then run `docker compose run --rm --no-deps --user root -e AUTORUN_ENABLED=false app composer install`.
 
 - `compose.yaml` is the production-style stack. `compose.override.yaml` (merged automatically) adds the dev bind mount, Vite, Mailpit, and turns off caching.
 - Migrations run automatically when the app container starts.
@@ -32,7 +32,7 @@ docker compose exec app composer require <pkg>   # add a package (must run in th
 
 ## Layout
 
-- `app/Services/GoogleCalendar.php`: the only code that talks to Google Calendar. It refreshes tokens, lists busy blocks, and creates events. It uses Laravel's `Http` client. **Don't add `google/apiclient`**: it's huge and its install times out on this Windows bind mount.
+- `app/Services/GoogleCalendar.php`: the only code that talks to Google Calendar. It refreshes tokens, lists busy blocks, and creates events. It uses Laravel's `Http` client. **Don't add `google/apiclient`**: it's huge (thousands of files), and installing it can time out on a slow Docker Desktop mount.
 - `app/Http/Controllers/Auth/GoogleController.php`: Socialite sign-in, the domain check, and storing tokens (encrypted casts on `User`).
 - `config/meetingpoll.php`: allowed domain, dev allowlist, grid hours, meeting lengths.
 - Livewire pages:
@@ -65,11 +65,11 @@ docker compose exec app composer require <pkg>   # add a package (must run in th
   - Docker env vars sit in `$_SERVER`, so `phpunit.xml` sets every value as both `<env force>` and `<server force>`.
   - A cached config (`php artisan optimize`) would still point tests at the dev MySQL, and `RefreshDatabase` would wipe it. `tests/TestCase.php` refuses to run unless the database is in-memory SQLite. **Keep that guard.**
   - Dev turns off all the image's `AUTORUN_LARAVEL_*_CACHE` steps for the same reason. If tests ever trip the guard, run `php artisan optimize:clear`.
-- **Bind-mount permissions:** the D: drive is mounted into the containers with Linux permissions stored as metadata. If the container can't write to `storage/` or `bootstrap/cache`, run `chmod -R a+rwX` on them from a `--user root` container.
-- **Shell quoting:** in the Bash tool, heredocs containing PHP with apostrophes can break quoting. Use the Write or Edit tools for PHP files.
+- **Bind-mount permissions:** the app runs as `www-data` (UID 33), which may not own the files in the mounted project folder. If the container can't write to `storage/` or `bootstrap/cache`, fix it once with `docker compose run --rm --no-deps --user root -e AUTORUN_ENABLED=false app chmod -R a+rwX storage bootstrap/cache`.
+- **Shell quoting:** when writing PHP files from a shell, heredocs containing apostrophes can break quoting. Use a file-writing or editing tool for PHP files instead.
 
 ## Conventions
 
 - Match Laravel 13 skeleton style: attribute-based `#[Fillable]` / `#[Hidden]` on models, and `casts()` methods.
 - Add a feature test for every behavior change. Fake Google with `Http::fake()` and `Socialite::fake('google', GoogleUser::fake([...]))`, and never call real Google APIs from tests.
-- The git remote, when there is one, is Forgejo (`code.reedpeople.com`), not GitHub. See the global CLAUDE.md for API notes.
+- The repo is on GitHub (`greed77/meeting-poll`). The default branch is `main`.

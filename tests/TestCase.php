@@ -16,5 +16,8 @@ abstract class TestCase extends BaseTestCase
         if (config('database.default') !== 'sqlite' || config('database.connections.sqlite.database') !== ':memory:') {
             throw new RuntimeException('Tests must use the in-memory SQLite database. Run `php artisan optimize:clear` and try again.');
         }
+
+        // Pages render without built assets or a running Vite dev server (fresh clones, CI).
+        $this->withoutVite();
     }
 }
