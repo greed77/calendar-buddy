@@ -72,4 +72,4 @@ docker compose exec app composer require <pkg>   # add a package (must run in th
 
 - Match Laravel 13 skeleton style: attribute-based `#[Fillable]` / `#[Hidden]` on models, and `casts()` methods.
 - Add a feature test for every behavior change. Fake Google with `Http::fake()` and `Socialite::fake('google', GoogleUser::fake([...]))`, and never call real Google APIs from tests.
-- The repo is on GitHub (`greed77/meeting-poll`). The default branch is `main`.
+- The repo is on GitHub (`greed77/calendar-buddy`). The default branch is `main`.

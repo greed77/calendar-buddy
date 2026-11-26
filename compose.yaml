@@ -1,5 +1,6 @@
 # Production-style stack: app (web), worker (queued mail), mysql.
 # For local development, compose.override.yaml is merged in automatically.
+name: meeting-poll
 services:
   app:
     build:
